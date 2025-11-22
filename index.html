@@ -183,7 +183,16 @@
         <!-- Canvas Toolbar (shown after joining) -->
         <div class="canvas-toolbar" id="canvas-toolbar" style="display: none;">
             <button class="tool-btn active" data-tool="draw">✏️ Draw</button>
+            <button class="tool-btn" data-tool="eraser">🧹 Eraser</button>
             <button class="tool-btn" data-tool="text">📝 Text</button>
+            
+            <!-- Color Picker -->
+            <div class="color-picker-container">
+                <label for="draw-color" class="color-label">🎨</label>
+                <input type="color" id="draw-color" class="color-input" value="#000000" title="Choose drawing color">
+                <div class="color-preview" id="color-preview"></div>
+            </div>
+            
             <div class="tool-info">Click and drag to draw anywhere!</div>
         </div>
     </section>

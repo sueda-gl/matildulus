@@ -1250,11 +1250,57 @@ body {
     transform: scale(1.05);
 }
 
+.canvas-toolbar .tool-btn[data-tool="eraser"].active {
+    background: #FF6B6B;
+    color: white;
+    box-shadow: 3px 3px 0 var(--grape-soda);
+}
+
 .canvas-toolbar .tool-info {
     font-size: 0.9rem;
     color: #666;
     font-style: italic;
     margin-left: 10px;
+}
+
+/* Color Picker Container */
+.color-picker-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+}
+
+.color-label {
+    font-size: 1.3rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.color-input {
+    width: 50px;
+    height: 40px;
+    border: 3px solid var(--grape-soda);
+    border-radius: 8px;
+    cursor: pointer;
+    background: white;
+    padding: 2px;
+    transition: all 0.3s ease;
+}
+
+.color-input:hover {
+    border-color: var(--dark-green);
+    transform: scale(1.1);
+}
+
+.color-preview {
+    width: 30px;
+    height: 30px;
+    border: 2px solid var(--grape-soda);
+    border-radius: 50%;
+    background: #000000;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
 }
 
 /* Legacy sticky note styles (kept for compatibility, not used) */
@@ -1892,6 +1938,25 @@ footer p {
     .canvas-toolbar .tool-info {
         font-size: 0.8rem;
         display: none; /* Hide on mobile for space */
+    }
+    
+    .color-picker-container {
+        gap: 6px;
+        padding: 0 5px;
+    }
+    
+    .color-input {
+        width: 40px;
+        height: 35px;
+    }
+    
+    .color-preview {
+        width: 25px;
+        height: 25px;
+    }
+    
+    .color-label {
+        font-size: 1.1rem;
     }
     
     .join-btn {

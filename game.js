@@ -7,6 +7,7 @@ class MessageWallGame {
     this.userId = null;
     this.userName = null;
     this.userColor = null;
+    this.currentColor = '#000000'; // Default to black, will be set to user's color when joining
     this.isDrawing = false;
     this.currentTool = 'draw'; // 'draw' or 'text'
     this.cursors = {}; // Other users' cursors
@@ -108,7 +109,8 @@ class MessageWallGame {
     // Set drawing properties
     this.ctx.imageSmoothingEnabled = true;
     this.ctx.imageSmoothingQuality = 'high';
-    this.ctx.strokeStyle = '#000000';
+    this.ctx.globalCompositeOperation = 'source-over';
+    this.ctx.strokeStyle = this.currentColor || '#000000';
     this.ctx.lineWidth = 3;
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
@@ -188,6 +190,7 @@ class MessageWallGame {
     this.socket.on('init-state', (data) => {
       this.userId = data.userId;
       this.userColor = data.color;
+      this.currentColor = data.color || '#000000'; // Set initial color to user's assigned color
       
       // Load existing drawings and texts
       this.loadExistingData(data.canvasData);
@@ -277,16 +280,40 @@ class MessageWallGame {
         this.currentTool = newBtn.dataset.tool;
         const info = document.querySelector('.canvas-toolbar .tool-info');
         if (info) {
-          info.textContent = this.currentTool === 'draw' 
-            ? 'Click and drag to draw anywhere!' 
-            : 'Click to place text';
+          if (this.currentTool === 'draw') {
+            info.textContent = 'Click and drag to draw anywhere!';
+          } else if (this.currentTool === 'eraser') {
+            info.textContent = 'Click and drag to erase!';
+          } else if (this.currentTool === 'text') {
+            info.textContent = 'Click to place text';
+          }
         }
         // Update cursor
         if (this.canvas) {
-          this.canvas.style.cursor = this.currentTool === 'draw' ? 'crosshair' : 'text';
+          if (this.currentTool === 'draw' || this.currentTool === 'eraser') {
+            this.canvas.style.cursor = 'crosshair';
+          } else if (this.currentTool === 'text') {
+            this.canvas.style.cursor = 'text';
+          }
         }
       });
     });
+
+    // Setup color picker
+    const colorInput = document.getElementById('draw-color');
+    const colorPreview = document.getElementById('color-preview');
+    
+    if (colorInput && colorPreview) {
+      // Set initial color to user's assigned color
+      colorInput.value = this.currentColor;
+      colorPreview.style.background = this.currentColor;
+      
+      // Update color when changed
+      colorInput.addEventListener('input', (e) => {
+        this.currentColor = e.target.value;
+        colorPreview.style.background = this.currentColor;
+      });
+    }
 
     this.showNotification(`Welcome ${this.userName}! Start drawing! 🦎`);
   }
@@ -294,9 +321,14 @@ class MessageWallGame {
   loadExistingData(canvasData) {
     if (!canvasData) return;
     
-    // Draw existing paths
+    // Draw existing paths - sort by timestamp to ensure correct order
+    // (eraser strokes must be applied after the drawings they erase)
     if (canvasData.drawings) {
-      canvasData.drawings.forEach(drawing => {
+      const sortedDrawings = [...canvasData.drawings].sort((a, b) => {
+        return (a.timestamp || 0) - (b.timestamp || 0);
+      });
+      
+      sortedDrawings.forEach(drawing => {
         this.drawRemotePath(drawing);
       });
     }
@@ -362,7 +394,7 @@ class MessageWallGame {
       e.preventDefault();
       e.stopPropagation();
       
-      if (this.currentTool === 'draw') {
+      if (this.currentTool === 'draw' || this.currentTool === 'eraser') {
         this.startDrawing(getMousePos(e));
         
         // Add global listeners to track mouse even outside canvas
@@ -372,7 +404,7 @@ class MessageWallGame {
           if (e.clientX >= rect.left - 10 && e.clientX <= rect.right + 10 &&
               e.clientY >= rect.top - 10 && e.clientY <= rect.bottom + 10) {
             const pos = getMousePos(e);
-            if (this.isDrawing && this.currentTool === 'draw') {
+            if (this.isDrawing && (this.currentTool === 'draw' || this.currentTool === 'eraser')) {
               this.draw(pos);
             }
           }
@@ -402,7 +434,7 @@ class MessageWallGame {
     this.canvas.addEventListener('mousemove', (e) => {
       const pos = getMousePos(e);
       
-      if (this.isDrawing && this.currentTool === 'draw') {
+      if (this.isDrawing && (this.currentTool === 'draw' || this.currentTool === 'eraser')) {
         this.draw(pos);
       }
       
@@ -430,7 +462,7 @@ class MessageWallGame {
     // Touch events for mobile
     this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      if (this.currentTool === 'draw') {
+      if (this.currentTool === 'draw' || this.currentTool === 'eraser') {
         this.startDrawing(getTouchPos(e));
       } else if (this.currentTool === 'text') {
         this.placeText(getTouchPos(e));
@@ -439,7 +471,7 @@ class MessageWallGame {
 
     this.canvas.addEventListener('touchmove', (e) => {
       e.preventDefault();
-      if (this.isDrawing && this.currentTool === 'draw') {
+      if (this.isDrawing && (this.currentTool === 'draw' || this.currentTool === 'eraser')) {
         this.draw(getTouchPos(e));
       }
     });
@@ -463,7 +495,16 @@ class MessageWallGame {
     this.currentPath = [pos];
     
     // Set drawing properties
-    this.ctx.strokeStyle = '#000000';
+    if (this.currentTool === 'eraser') {
+      // Eraser mode: use destination-out to erase pixels
+      this.ctx.globalCompositeOperation = 'destination-out';
+      this.ctx.strokeStyle = 'rgba(0,0,0,1)'; // Full opacity for erasing
+    } else {
+      // Draw mode: normal drawing
+      this.ctx.globalCompositeOperation = 'source-over';
+      this.ctx.strokeStyle = this.currentColor;
+    }
+    
     this.ctx.lineWidth = 3;
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
@@ -487,6 +528,11 @@ class MessageWallGame {
     
     this.isDrawing = false;
     
+    // Reset composite operation to normal
+    if (this.ctx) {
+      this.ctx.globalCompositeOperation = 'source-over';
+    }
+    
     // Send path to server (normalize coordinates to standard 1400x600)
     if (this.socket && this.currentPath.length > 0) {
       // Normalize path coordinates based on canvas size (for consistency across screens)
@@ -496,8 +542,13 @@ class MessageWallGame {
         y: (point.y / this.canvasHeight) * 600
       }));
       
+      // Determine type: 'draw' or 'eraser'
+      const strokeType = this.currentTool === 'eraser' ? 'eraser' : 'draw';
+      
       this.socket.emit('draw', {
-        path: normalizedPath
+        path: normalizedPath,
+        color: this.currentColor,
+        type: strokeType
       });
     }
     
@@ -567,7 +618,8 @@ class MessageWallGame {
           this.socket.emit('text-add', {
             text: text,
             x: (textPos.x / this.canvasWidth) * 1400,
-            y: (textPos.y / this.canvasHeight) * 600
+            y: (textPos.y / this.canvasHeight) * 600,
+            color: this.currentColor
           });
         }
       }
@@ -598,7 +650,7 @@ class MessageWallGame {
     
     // Set text properties
     this.ctx.font = '20px "Comic Neue", cursive';
-    this.ctx.fillStyle = '#000000';
+    this.ctx.fillStyle = this.currentColor;
     this.ctx.textBaseline = 'top';
     this.ctx.fillText(text, pos.x, pos.y);
   }
@@ -612,8 +664,20 @@ class MessageWallGame {
     const scaleX = this.canvasWidth / 1400;
     const scaleY = this.canvasHeight / 600;
     
-    // Set drawing properties
-    this.ctx.strokeStyle = '#000000';
+    // Save current composite operation
+    const savedComposite = this.ctx.globalCompositeOperation;
+    
+    // Set drawing properties based on type
+    if (drawing.type === 'eraser') {
+      // Eraser mode: use destination-out to erase pixels
+      this.ctx.globalCompositeOperation = 'destination-out';
+      this.ctx.strokeStyle = 'rgba(0,0,0,1)'; // Full opacity for erasing
+    } else {
+      // Draw mode: normal drawing
+      this.ctx.globalCompositeOperation = 'source-over';
+      this.ctx.strokeStyle = drawing.color || '#000000';
+    }
+    
     this.ctx.lineWidth = 3;
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
@@ -626,6 +690,9 @@ class MessageWallGame {
     }
     
     this.ctx.stroke();
+    
+    // Restore composite operation
+    this.ctx.globalCompositeOperation = savedComposite;
   }
 
   drawRemoteText(textData) {
@@ -637,7 +704,7 @@ class MessageWallGame {
     
     // Set text properties
     this.ctx.font = '20px "Comic Neue", cursive';
-    this.ctx.fillStyle = '#000000';
+    this.ctx.fillStyle = textData.color || '#000000';
     this.ctx.textBaseline = 'top';
     
     this.ctx.fillText(
