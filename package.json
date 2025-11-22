@@ -1,0 +1,19 @@
+{
+  "name": "matildulus-message-wall",
+  "version": "1.0.0",
+  "description": "Interactive collaborative message wall for graduation party",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.6.1",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
+
